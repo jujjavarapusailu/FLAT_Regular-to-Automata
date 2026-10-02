@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regular Grammar ↔ Finite Automata Converter</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f6fc;
+    color: #192238;
+}
+
+header {
+    background: linear-gradient(120deg, #25276f, #6869eb);
+    color: white;
+    padding: 25px 35px;
+}
+
+header h1 {
+    margin: 0 0 8px;
+    font-size: 30px;
+}
+
+header p {
+    margin: 0;
+    color: #e8e9ff;
+}
+
+main {
+    max-width: 1250px;
+    margin: 25px auto;
+    padding: 0 20px;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+button {
+    border: 0;
+    border-radius: 8px;
+    padding: 12px 18px;
+    background: #e6e9f5;
+    color: #26304b;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button.active, .primary {
+    background: #5c5de2;
+    color: white;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    border: 1px solid #dfe5f0;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 5px 20px #1b2a4b0a;
+}
+
+h2 {
+    margin-top: 0;
+    font-size: 20px;
+}
+
+label {
+    display: block;
+    font-weight: bold;
+    margin: 12px 0 6px;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #ccd4e4;
+    border-radius: 8px;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+}
+
+textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.hint {
+    color: #65718a;
+    font-size: 13px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+#result {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: #f8f9fd;
+    border: 1px solid #e0e5ef;
+    padding: 15px;
+    border-radius: 9px;
+    font-family: Consolas, monospace;
+}
+
+#steps li { margin: 10px 0; }
+
+.graph {
+    overflow: auto;
+    border: 1px solid #dfe5f0;
+    border-radius: 10px;
+    background: #fcfdff;
+}
+
+svg {
+    display: block;
+    width: 100%;
+    min-width: 550px;
+    height: 380px;
+}
+
+.error {
+    color: #a51d1d;
+    background: #fff0ef;
+    padding: 12px;
+    border-radius: 8px;
+}
+
+@media(max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+    header { padding: 22px; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>Regular Grammar ↔ Finite Automata Converter</h1>
+    <p>
+        Convert regular grammars and finite automata,
+        understand each conversion step, and visualize the automaton.
+    </p>
+</header>
+
+<main>
+
+<div class="tabs">
+    <button id="grammarTab" class="active" onclick="setMode('grammar')">
+        Grammar → Automaton
+    </button>
+
+    <button id="automatonTab" onclick="setMode('automaton')">
+        Automaton → Grammar
+    </button>
+</div>
+
+<div class="grid">
+
+<section class="card">
+    <h2>Regular Grammar Input</h2>
+    <p class="hint">
+        Enter right-linear grammar productions, one per line.
+        Example: S → aA | b
+    </p>
+
+    <label for="grammar">Grammar Productions</label>
+    <textarea id="grammar">S → aA | b
+A → aA | b</textarea>
+
+    <div class="actions">
+        <button onclick="loadGrammarExample()">Load Example</button>
+        <button class="primary" onclick="grammarToFA()">Convert to Automaton</button>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Finite Automaton Input</h2>
+    <p class="hint">Enter transitions using the format: state,symbol,nextState</p>
+
+    <label for="states">States</label>
+    <input id="states" value="q0, q1, q2">
+
+    <label for="alphabet">Alphabet</label>
+    <input id="alphabet" value="a, b">
+
+    <label for="start">Start State</label>
+    <input id="start" value="q0">
+
+    <label for="finals">Accepting States</label>
+    <input id="finals" value="q2">
+
+    <label for="transitions">Transitions</label>
+    <textarea id="transitions">q0,a,q1
+q0,b,q2
+q1,a,q1
+q1,b,q2</textarea>
+
+    <div class="actions">
+        <button onclick="loadAutomatonExample()">Load Example</button>
+        <button class="primary" onclick="faToGrammar()">Convert to Grammar</button>
+    </div>
+</section>
+
+</div>
+
+<section class="card">
+    <h2>Conversion Result</h2>
+    <div id="result">Select a conversion and click the Convert button.</div>
+
+    <h3>Step-by-step Explanation</h3>
+    <ol id="steps">
+        <li>Your conversion steps will appear here.</li>
+    </ol>
+</section>
+
+<section class="card">
+    <h2>Automaton Visualization</h2>
+    <p class="hint">
+        Incoming arrow indicates the start state.
+        Double circles indicate accepting states.
+        Arrowheads show transition directions.
+    </p>
+
+    <div class="graph">
+        <svg id="diagram" viewBox="0 0 800 380"
+             role="img" aria-label="Finite automaton diagram"></svg>
+    </div>
+</section>
+
+</main>
+
+<script>
+function setMode(mode) {
+    document.getElementById("grammarTab").classList.toggle("active", mode === "grammar");
+    document.getElementById("automatonTab").classList.toggle("active", mode === "automaton");
+}
+
+function loadGrammarExample() {
+    document.getElementById("grammar").value = `S → aA | b
+A → aA | b`;
+}
+
+function loadAutomatonExample() {
+    document.getElementById("states").value = "q0, q1, q2";
+    document.getElementById("alphabet").value = "a, b";
+    document.getElementById("start").value = "q0";
+    document.getElementById("finals").value = "q2";
+    document.getElementById("transitions").value = `q0,a,q1
+q0,b,q2
+q1,a,q1
+q1,b,q2`;
+}
+
+function showResult(text, steps, fa) {
+    document.getElementById("result").textContent = text;
+
+    const list = document.getElementById("steps");
+    list.innerHTML = "";
+
+    steps.forEach(step => {
+        const li = document.createElement("li");
+        li.textContent = step;
+        list.appendChild(li);
+    });
+
+    drawAutomaton(fa);
+}
+
+function showError(message) {
+    const result = document.getElementById("result");
+    result.innerHTML = "";
+
+    const div = document.createElement("div");
+    div.className = "error";
+    div.textContent = message;
+    result.appendChild(div);
+
+    document.getElementById("steps").innerHTML =
+        "<li>Please correct the input and try again.</li>";
+
+    document.getElementById("diagram").innerHTML = "";
+}
+
+function parseGrammar(text) {
+    const rules = {};
+    const steps = [];
+
+    const lines = text.split(/\n/).map(line => line.trim()).filter(Boolean);
+
+    for (const line of lines) {
+        const parts = line.split(/->|→|::=/);
+
+        if (parts.length !== 2) {
+            throw Error("Invalid production: " + line + ". Use → or ->.");
+        }
+
+        const lhs = parts[0].trim();
+
+        if (!/^[A-Z][A-Za-z0-9_]*$/.test(lhs)) {
+            throw Error("Nonterminal must start with an uppercase letter: " + lhs);
+        }
+
+        const alternatives = parts[1].split("|").map(x => x.trim()).filter(Boolean);
+
+        if (!alternatives.length) {
+            throw Error("Missing production on the right-hand side.");
+        }
+
+        if (!rules[lhs]) rules[lhs] = [];
+        rules[lhs].push(...alternatives);
+    }
+
+    const variables = Object.keys(rules);
+
+    if (!variables.length) {
+        throw Error("Please enter at least one production.");
+    }
+
+    const rename = {};
+    variables.forEach((variable, index) => {
+        rename[variable] = "q" + index;
+    });
+
+    const states = variables.map(variable => rename[variable]);
+    const alphabet = new Set();
+    const transitions = [];
+    const finals = new Set();
+    const finalSink = "qf";
+
+    for (const [lhs, alternatives] of Object.entries(rules)) {
+        for (const rhs of alternatives) {
+            if (rhs === "ε" || rhs.toLowerCase() === "epsilon") {
+                finals.add(rename[lhs]);
+                steps.push("Production " + lhs + " → ε: mark " + rename[lhs] + " as an accepting state.");
+                continue;
+            }
+
+            const match = rhs.match(/^([a-z0-9])([A-Z][A-Za-z0-9_]*)?$/);
+
+            if (!match) {
+                throw Error("Unsupported production: " + lhs + " → " + rhs +
+                    ". Use one terminal optionally followed by one nonterminal, or ε.");
+            }
+
+            const symbol = match[1];
+            const targetVariable = match[2];
+
+            if (targetVariable && !rename[targetVariable]) {
+                throw Error("Nonterminal " + targetVariable + " has no production rule.");
+            }
+
+            const target = targetVariable ? rename[targetVariable] : finalSink;
+            alphabet.add(symbol);
+
+            if (!targetVariable && !states.includes(finalSink)) {
+                states.push(finalSink);
+            }
+
+            transitions.push({ from: rename[lhs], symbol: symbol, to: target });
+
+            if (!targetVariable) finals.add(finalSink);
+
+            steps.push("Production " + lhs + " → " + rhs +
+                ": add transition " + rename[lhs] + " —" + symbol + "→ " + target +
+                (targetVariable ? "." : " and mark " + finalSink + " as accepting."));
+        }
+    }
+
+    if (!finals.size) {
+        throw Error("No accepting state was created. Add a terminal-only production or ε-production.");
+    }
+
+    return {
+        states,
+        alphabet: [...alphabet],
+        start: rename[variables[0]],
+        finals: [...finals],
+        transitions,
+        steps
+    };
+}
+
+function grammarToFA() {
+    try {
+        const fa = parseGrammar(document.getElementById("grammar").value);
+
+        const text =
+`States: { ${fa.states.join(", ")} }
+
+Alphabet: { ${fa.alphabet.join(", ")} }
+
+Start state: ${fa.start}
+
+Accepting states: { ${fa.finals.join(", ")} }
+
+Transitions:
+${fa.transitions.map(t => t.from + " --" + t.symbol + "--> " + t.to).join("\n")}`;
+
+        showResult(text, fa.steps, fa);
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+function parseList(id) {
+    return document.getElementById(id).value.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function faToGrammar() {
+    try {
+        const states = parseList("states");
+        const alphabet = parseList("alphabet");
+        const start = document.getElementById("start").value.trim();
+        const finals = parseList("finals");
+        const transitions = [];
+
+        if (!states.length || !states.includes(start)) {
+            throw Error("The start state must be included in the states list.");
+        }
+
+        if (new Set(states).size !== states.length) {
+            throw Error("State names must not be duplicated.");
+        }
+
+        if (finals.some(state => !states.includes(state))) {
+            throw Error("Every accepting state must be included in the states list.");
+        }
+
+        // Read transitions
+        const lines = document.getElementById("transitions").value
+            .split(/\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+        for (const line of lines) {
+            const parts = line.split(",").map(s => s.trim());
+
+            if (parts.length !== 3) {
+                throw Error(
+                    'Invalid transition "' + line +
+                    '". Format: state,symbol,nextState.'
+                );
+            }
+
+            const [from, symbol, to] = parts;
+
+            if (!states.includes(from) || !states.includes(to)) {
+                throw Error("Transition references an unknown state: " + line);
+            }
+
+            if (!alphabet.includes(symbol)) {
+                throw Error("Symbol " + symbol + " is not in the alphabet.");
+            }
+
+            transitions.push({ from, symbol, to });
+        }
+
+        // Map automaton states to grammar variables A0, A1, A2...
+        const variableMap = {};
+
+        states.forEach((state, index) => {
+            variableMap[state] = "A" + index;
+        });
+
+        const steps = [];
+        const productions = [];
+
+        steps.push(
+            "Assign a grammar nonterminal to each automaton state: " +
+            states.map(state => state + " = " + variableMap[state]).join(", ") + "."
+        );
+
+        steps.push(
+            "The grammar start symbol is " + variableMap[start] + "."
+        );
+
+        // Generate grammar productions
+        for (const state of states) {
+            const alternatives = [];
+
+            for (const transition of transitions.filter(t => t.from === state)) {
+                alternatives.push(
+                    transition.symbol + variableMap[transition.to]
+                );
+
+                steps.push(
+                    "Transition " + transition.from +
+                    " --" + transition.symbol + "--> " + transition.to +
+                    " becomes production " + variableMap[state] +
+                    " → " + transition.symbol + variableMap[transition.to] + "."
+                );
+            }
+
+            // Accepting states get epsilon productions
+            if (finals.includes(state)) {
+                alternatives.push("ε");
+
+                steps.push(
+                    "Accepting state " + state +
+                    " gets production " + variableMap[state] + " → ε."
+                );
+            }
+
+            if (alternatives.length) {
+                productions.push(
+                    variableMap[state] + " → " + alternatives.join(" | ")
+                );
+            } else {
+                productions.push(variableMap[state] + " → ∅");
+
+                steps.push(
+                    "State " + state +
+                    " has no outgoing transitions and is not accepting."
+                );
+            }
+        }
+
+        // Display grammar output without the automaton diagram
+        document.getElementById("result").textContent =
+            "Equivalent right-linear grammar:\n\n" +
+            "Start Symbol: " + variableMap[start] + "\n\n" +
+            productions.join("\n");
+
+        // Display conversion steps
+        const list = document.getElementById("steps");
+        list.innerHTML = "";
+
+        steps.forEach(step => {
+            const li = document.createElement("li");
+            li.textContent = step;
+            list.appendChild(li);
+        });
+
+        // Clear the diagram for Automaton → Grammar mode
+        document.getElementById("diagram").innerHTML = "";
+
+    } catch (error) {
+        showError(error.message);
+    }
+}
+          
+      
+
+
+
+
+
+
+/* UPDATED DRAW FUNCTION: arrows end at the edge of each state circle */
+function drawAutomaton(fa) {
+    const svg = document.getElementById("diagram");
+    svg.innerHTML = "";
+
+    if (!fa || !fa.states.length) return;
+
+    const NS = "http://www.w3.org/2000/svg";
+
+    function add(tag, attrs, text = "") {
+        const node = document.createElementNS(NS, tag);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        if (text) node.textContent = text;
+        svg.appendChild(node);
+        return node;
+    }
+
+    const defs = add("defs", {});
+    const marker = document.createElementNS(NS, "marker");
+
+    Object.entries({
+        id: "arrowhead",
+        markerWidth: 10,
+        markerHeight: 10,
+        refX: 9,
+        refY: 3,
+        orient: "auto",
+        markerUnits: "userSpaceOnUse"
+    }).forEach(([key, value]) => marker.setAttribute(key, value));
+
+    const arrowPath = document.createElementNS(NS, "path");
+    arrowPath.setAttribute("d", "M0,0 L0,6 L9,3 z");
+    arrowPath.setAttribute("fill", "#59627a");
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+
+    const count = fa.states.length;
+    const cx = 400, cy = 185;
+    const rx = Math.min(300, 90 + count * 28);
+    const ry = 115;
+    const radius = 29;
+    const positions = {};
+
+    fa.states.forEach((state, index) => {
+        const angle = -Math.PI / 2 + 2 * Math.PI * index / count;
+        positions[state] = {
+            x: cx + rx * Math.cos(angle),
+            y: cy + ry * Math.sin(angle)
+        };
+    });
+
+    const grouped = {};
+
+    fa.transitions.forEach(transition => {
+        const key = JSON.stringify([transition.from, transition.to]);
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(transition.symbol);
+    });
+
+    Object.entries(grouped).forEach(([key, symbols]) => {
+        const [from, to] = JSON.parse(key);
+        const p = positions[from];
+        const q = positions[to];
+        if (!p || !q) return;
+
+        const label = symbols.join(", ");
+
+        if (from === to) {
+            add("path", {
+                d: `M ${p.x - 18} ${p.y - 22}
+                    C ${p.x - 70} ${p.y - 95},
+                      ${p.x + 70} ${p.y - 95},
+                      ${p.x + 18} ${p.y - 22}`,
+                fill: "none",
+                stroke: "#59627a",
+                "stroke-width": 1.8,
+                "marker-end": "url(#arrowhead)"
+            });
+
+            add("text", {
+                x: p.x,
+                y: p.y - 78,
+                "text-anchor": "middle",
+                fill: "#303951",
+                "font-size": 15
+            }, label);
+
+        } else {
+            const dx = q.x - p.x;
+            const dy = q.y - p.y;
+            const length = Math.hypot(dx, dy) || 1;
+            const ux = dx / length;
+            const uy = dy / length;
+
+            const startX = p.x + ux * radius;
+            const startY = p.y + uy * radius;
+            const endX = q.x - ux * (radius + 5);
+            const endY = q.y - uy * (radius + 5);
+
+            const mx = (startX + endX) / 2 - uy * 14;
+            const my = (startY + endY) / 2 + ux * 14;
+
+            add("path", {
+                d: `M ${startX} ${startY} Q ${mx} ${my} ${endX} ${endY}`,
+                fill: "none",
+                stroke: "#59627a",
+                "stroke-width": 1.8,
+                "marker-end": "url(#arrowhead)"
+            });
+
+            add("text", {
+                x: mx,
+                y: my - 8,
+                "text-anchor": "middle",
+                fill: "#303951",
+                "font-size": 15
+            }, label);
+        }
+    });
+
+    fa.states.forEach(state => {
+        const p = positions[state];
+
+        if (state === fa.start) {
+            add("path", {
+                d: `M ${p.x - 75} ${p.y} L ${p.x - radius - 5} ${p.y}`,
+                stroke: "#59627a",
+                "stroke-width": 1.8,
+                fill: "none",
+                "marker-end": "url(#arrowhead)"
+            });
+        }
+
+        add("circle", {
+            cx: p.x,
+            cy: p.y,
+            r: radius,
+            fill: "#eef0ff",
+            stroke: "#5558d9",
+            "stroke-width": 2
+        });
+
+        if (fa.finals.includes(state)) {
+            add("circle", {
+                cx: p.x,
+                cy: p.y,
+                r: 23,
+                fill: "none",
+                stroke: "#5558d9",
+                "stroke-width": 2
+            });
+        }
+
+        add("text", {
+            x: p.x,
+            y: p.y + 5,
+            "text-anchor": "middle",
+            fill: "#252b52",
+            "font-size": 15,
+            "font-weight": "bold"
+        }, state);
+    });
+}
+
+grammarToFA();
+</script>
+
+</body>
+</html>
